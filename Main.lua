@@ -8,6 +8,7 @@ local useAir = false
 local speed = 16
 local height = 40
 local tweening = false
+local noClip = false
 
 -- GUI
 if game.CoreGui:FindFirstChild("TweenTPGui") then
@@ -20,7 +21,7 @@ gui.ResetOnSpawn = false
 gui.Parent = game.CoreGui
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 320, 0, 290)
+frame.Size = UDim2.new(0, 320, 0, 330)
 frame.Position = UDim2.new(0.05, 0, 0.4, 0)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 frame.BorderSizePixel = 0
@@ -42,11 +43,12 @@ end
 local btnSetBase = createBtn("📍 Установить базу", 10)
 local btnTweenTP = createBtn("➡ Tween TP к базе", 55)
 local btnMode = createBtn("☁️ Режим: Воздух", 100)
+local btnNoClip = createBtn("🚫 No Clip: Выкл", 145)
 
 -- Ползунок скорости
 local speedLabel = Instance.new("TextLabel", frame)
 speedLabel.Size = UDim2.new(1, -20, 0, 20)
-speedLabel.Position = UDim2.new(0, 10, 0, 150)
+speedLabel.Position = UDim2.new(0, 10, 0, 190)
 speedLabel.Text = "Скорость: 16"
 speedLabel.TextColor3 = Color3.new(1, 1, 1)
 speedLabel.BackgroundTransparency = 1
@@ -55,7 +57,7 @@ speedLabel.TextSize = 14
 
 local speedSlider = Instance.new("Frame", frame)
 speedSlider.Size = UDim2.new(1, -20, 0, 10)
-speedSlider.Position = UDim2.new(0, 10, 0, 175)
+speedSlider.Position = UDim2.new(0, 10, 0, 215)
 speedSlider.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 
 local speedHandle = Instance.new("ImageButton", speedSlider)
@@ -67,7 +69,7 @@ speedHandle.Image = ""
 -- Ползунок высоты
 local heightLabel = Instance.new("TextLabel", frame)
 heightLabel.Size = UDim2.new(1, -20, 0, 20)
-heightLabel.Position = UDim2.new(0, 10, 0, 195)
+heightLabel.Position = UDim2.new(0, 10, 0, 235)
 heightLabel.Text = "Высота (только воздух): 40"
 heightLabel.TextColor3 = Color3.new(1, 1, 1)
 heightLabel.BackgroundTransparency = 1
@@ -76,7 +78,7 @@ heightLabel.TextSize = 14
 
 local heightSlider = Instance.new("Frame", frame)
 heightSlider.Size = UDim2.new(1, -20, 0, 10)
-heightSlider.Position = UDim2.new(0, 10, 0, 220)
+heightSlider.Position = UDim2.new(0, 10, 0, 260)
 heightSlider.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 
 local heightHandle = Instance.new("ImageButton", heightSlider)
@@ -176,6 +178,24 @@ btnTweenTP.MouseButton1Click:Connect(function()
             hrp.Anchored = false
         else
             tweenTo(basePos)
+        end
+    end
+end)
+
+btnNoClip.MouseButton1Click:Connect(function()
+    noClip = not noClip
+    btnNoClip.Text = noClip and "✅ No Clip: Вкл" or "🚫 No Clip: Выкл"
+end)
+
+RunService.Stepped:Connect(function()
+    if noClip then
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
         end
     end
 end)
