@@ -1,150 +1,170 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local basePos = nil
 local useAir = false
-local speed = 16
-local height = 40
-local tweening = false
+local tweenSpeed = 16
+local noClipSpeed = 50
 local noClip = false
+local tweening = false
 
--- GUI
+-- Удаляем старый GUI если есть
 if game.CoreGui:FindFirstChild("TweenTPGui") then
     game.CoreGui:FindFirstChild("TweenTPGui"):Destroy()
 end
 
-local gui = Instance.new("ScreenGui")
+-- Создаём GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
 gui.Name = "TweenTPGui"
 gui.ResetOnSpawn = false
-gui.Parent = game.CoreGui
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 320, 0, 330)
+frame.Size = UDim2.new(0, 320, 0, 300)
 frame.Position = UDim2.new(0.05, 0, 0.4, 0)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 
-local function createBtn(text, posY)
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(1, -20, 0, 35)
-    btn.Position = UDim2.new(0, 10, 0, posY)
-    btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 16
-    return btn
+local function createLabel(text, posY)
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(1, -20, 0, 20)
+    label.Position = UDim2.new(0, 10, 0, posY)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.Text = text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    return label
 end
 
-local btnSetBase = createBtn("📍 Установить базу", 10)
-local btnTweenTP = createBtn("➡ Tween TP к базе", 55)
-local btnMode = createBtn("☁️ Режим: Воздух", 100)
-local btnNoClip = createBtn("🚫 No Clip: Выкл", 145)
+local function createSlider(posY, minVal, maxVal, initialVal)
+    local sliderFrame = Instance.new("Frame", frame)
+    sliderFrame.Size = UDim2.new(1, -20, 0, 20)
+    sliderFrame.Position = UDim2.new(0, 10, 0, posY)
+    sliderFrame.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 
--- Ползунок скорости
-local speedLabel = Instance.new("TextLabel", frame)
-speedLabel.Size = UDim2.new(1, -20, 0, 20)
-speedLabel.Position = UDim2.new(0, 10, 0, 190)
-speedLabel.Text = "Скорость: 16"
-speedLabel.TextColor3 = Color3.new(1, 1, 1)
-speedLabel.BackgroundTransparency = 1
-speedLabel.Font = Enum.Font.Gotham
-speedLabel.TextSize = 14
+    local fill = Instance.new("Frame", sliderFrame)
+    fill.Size = UDim2.new((initialVal - minVal) / (maxVal - minVal), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(150, 150, 250)
 
-local speedSlider = Instance.new("Frame", frame)
-speedSlider.Size = UDim2.new(1, -20, 0, 10)
-speedSlider.Position = UDim2.new(0, 10, 0, 215)
-speedSlider.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    local handle = Instance.new("ImageButton", sliderFrame)
+    handle.Size = UDim2.new(0, 16, 1, 0)
+    handle.Position = UDim2.new((initialVal - minVal) / (maxVal - minVal), -8, 0, 0)
+    handle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+    handle.Image = ""
 
-local speedHandle = Instance.new("ImageButton", speedSlider)
-speedHandle.Size = UDim2.new(0, 20, 1, 0)
-speedHandle.Position = UDim2.new((speed - 5) / 95, 0, 0, 0)
-speedHandle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-speedHandle.Image = ""
+    return sliderFrame, fill, handle
+end
 
--- Ползунок высоты
-local heightLabel = Instance.new("TextLabel", frame)
-heightLabel.Size = UDim2.new(1, -20, 0, 20)
-heightLabel.Position = UDim2.new(0, 10, 0, 235)
-heightLabel.Text = "Высота (только воздух): 40"
-heightLabel.TextColor3 = Color3.new(1, 1, 1)
-heightLabel.BackgroundTransparency = 1
-heightLabel.Font = Enum.Font.Gotham
-heightLabel.TextSize = 14
+-- Кнопки
+local btnSetBase = Instance.new("TextButton", frame)
+btnSetBase.Size = UDim2.new(1, -20, 0, 35)
+btnSetBase.Position = UDim2.new(0, 10, 0, 10)
+btnSetBase.Text = "📍 Установить базу"
+btnSetBase.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+btnSetBase.TextColor3 = Color3.new(1, 1, 1)
+btnSetBase.Font = Enum.Font.GothamBold
+btnSetBase.TextSize = 16
 
-local heightSlider = Instance.new("Frame", frame)
-heightSlider.Size = UDim2.new(1, -20, 0, 10)
-heightSlider.Position = UDim2.new(0, 10, 0, 260)
-heightSlider.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+local btnTweenTP = Instance.new("TextButton", frame)
+btnTweenTP.Size = UDim2.new(1, -20, 0, 35)
+btnTweenTP.Position = UDim2.new(0, 10, 0, 55)
+btnTweenTP.Text = "➡ Tween TP к базе"
+btnTweenTP.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+btnTweenTP.TextColor3 = Color3.new(1, 1, 1)
+btnTweenTP.Font = Enum.Font.GothamBold
+btnTweenTP.TextSize = 16
 
-local heightHandle = Instance.new("ImageButton", heightSlider)
-heightHandle.Size = UDim2.new(0, 20, 1, 0)
-heightHandle.Position = UDim2.new((height - 10) / 90, 0, 0, 0)
-heightHandle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-heightHandle.Image = ""
+local btnMode = Instance.new("TextButton", frame)
+btnMode.Size = UDim2.new(1, -20, 0, 35)
+btnMode.Position = UDim2.new(0, 10, 0, 100)
+btnMode.Text = "☁️ Режим: Воздух"
+btnMode.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+btnMode.TextColor3 = Color3.new(1, 1, 1)
+btnMode.Font = Enum.Font.GothamBold
+btnMode.TextSize = 16
 
--- Логика ползунков
-local draggingSpeed, draggingHeight = false, false
+local btnNoClip = Instance.new("TextButton", frame)
+btnNoClip.Size = UDim2.new(1, -20, 0, 35)
+btnNoClip.Position = UDim2.new(0, 10, 0, 145)
+btnNoClip.Text = "🚫 No Clip: Выкл"
+btnNoClip.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+btnNoClip.TextColor3 = Color3.new(1, 1, 1)
+btnNoClip.Font = Enum.Font.GothamBold
+btnNoClip.TextSize = 16
+
+-- Labels и слайдеры для скоростей
+local speedLabel = createLabel("Скорость Tween TP: "..tweenSpeed, 190)
+local speedSliderFrame, speedFill, speedHandle = createSlider(215, 5, 100, tweenSpeed)
+
+local noclipLabel = createLabel("Скорость No Clip: "..noClipSpeed, 245)
+local noclipSliderFrame, noclipFill, noclipHandle = createSlider(270, 10, 200, noClipSpeed)
+
+-- Функции для обновления положения и значения ползунков
+local draggingSpeed = false
+local draggingNoClip = false
+
+local function updateSlider(sliderFrame, fill, handle, mouseX, minVal, maxVal)
+    local absPos = sliderFrame.AbsolutePosition.X
+    local absSize = sliderFrame.AbsoluteSize.X
+    local relativeX = math.clamp(mouseX - absPos, 0, absSize)
+    local percent = relativeX / absSize
+    fill.Size = UDim2.new(percent, 0, 1, 0)
+    handle.Position = UDim2.new(percent, -8, 0, 0)
+    local value = math.floor(minVal + percent * (maxVal - minVal))
+    return value
+end
 
 speedHandle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         draggingSpeed = true
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then draggingSpeed = false end
-        end)
     end
 end)
-
-heightHandle.InputBegan:Connect(function(input)
+speedHandle.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingHeight = true
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then draggingHeight = false end
-        end)
+        draggingSpeed = false
     end
 end)
 
-game:GetService("UserInputService").InputChanged:Connect(function(input)
+noclipHandle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingNoClip = true
+    end
+end)
+noclipHandle.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingNoClip = false
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement then
         if draggingSpeed then
-            local relX = input.Position.X - speedSlider.AbsolutePosition.X
-            local clampX = math.clamp(relX, 0, speedSlider.AbsoluteSize.X)
-            speedHandle.Position = UDim2.new(0, clampX, 0, 0)
-            local pct = clampX / speedSlider.AbsoluteSize.X
-            speed = math.floor(5 + pct * 95)
-            speedLabel.Text = "Скорость: " .. speed
-        elseif draggingHeight then
-            local relX = input.Position.X - heightSlider.AbsolutePosition.X
-            local clampX = math.clamp(relX, 0, heightSlider.AbsoluteSize.X)
-            heightHandle.Position = UDim2.new(0, clampX, 0, 0)
-            local pct = clampX / heightSlider.AbsoluteSize.X
-            height = math.floor(10 + pct * 90)
-            heightLabel.Text = "Высота (только воздух): " .. height
+            tweenSpeed = updateSlider(speedSliderFrame, speedFill, speedHandle, input.Position.X, 5, 100)
+            speedLabel.Text = "Скорость Tween TP: "..tweenSpeed
+        elseif draggingNoClip then
+            noClipSpeed = updateSlider(noclipSliderFrame, noclipFill, noclipHandle, input.Position.X, 10, 200)
+            noclipLabel.Text = "Скорость No Clip: "..noClipSpeed
         end
     end
 end)
 
--- Tween функция
-local function tweenTo(pos)
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = char.HumanoidRootPart
-    local distance = (pos - hrp.Position).Magnitude
-    local time = distance / speed
-    local ti = TweenInfo.new(time, Enum.EasingStyle.Linear)
-    local goal = {CFrame = CFrame.new(pos)}
-    local tw = TweenService:Create(hrp, ti, goal)
-    tw:Play()
-    tweening = true
-    tw.Completed:Wait()
-    tweening = false
-end
-
 -- Кнопки
+btnNoClip.MouseButton1Click:Connect(function()
+    noClip = not noClip
+    btnNoClip.Text = noClip and "✅ No Clip: Вкл" or "🚫 No Clip: Выкл"
+end)
+
+btnMode.MouseButton1Click:Connect(function()
+    useAir = not useAir
+    btnMode.Text = useAir and "☁️ Режим: Воздух" or "🌍 Режим: Земля"
+end)
+
 btnSetBase.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("HumanoidRootPart") then
@@ -155,46 +175,69 @@ btnSetBase.MouseButton1Click:Connect(function()
     end
 end)
 
-btnMode.MouseButton1Click:Connect(function()
-    useAir = not useAir
-    btnMode.Text = useAir and "☁️ Режим: Воздух" or "🌍 Режим: Земля"
+btnTweenTP.MouseButton1Click:Connect(function()
+    if not basePos or tweening then return end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    local hrp = char.HumanoidRootPart
+    local targetPos = basePos
+    if useAir then
+        targetPos = Vector3.new(basePos.X, basePos.Y + 40, basePos.Z)
+    end
+
+    local distance = (targetPos - hrp.Position).Magnitude
+    local time = distance / tweenSpeed
+    tweening = true
+    local tween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos)})
+    tween:Play()
+    tween.Completed:Wait()
+    tweening = false
 end)
 
-btnTweenTP.MouseButton1Click:Connect(function()
-    if basePos and not tweening then
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local hrp = char.HumanoidRootPart
+-- No Clip движение
+local activeKeys = {}
+local moveDirections = {
+    [Enum.KeyCode.W] = Vector3.new(0, 0, -1),
+    [Enum.KeyCode.S] = Vector3.new(0, 0, 1),
+    [Enum.KeyCode.A] = Vector3.new(-1, 0, 0),
+    [Enum.KeyCode.D] = Vector3.new(1, 0, 0),
+}
 
-        if useAir then
-            -- вверх
-            hrp.CFrame = hrp.CFrame + Vector3.new(0, height, 0)
-            task.wait(0.1)
-            -- полёт
-            local airPos = Vector3.new(basePos.X, basePos.Y + height, basePos.Z)
-            tweenTo(airPos)
-            task.wait(0.05)
-            -- падение
-            hrp.Anchored = false
-        else
-            tweenTo(basePos)
-        end
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if moveDirections[input.KeyCode] then
+        activeKeys[input.KeyCode] = true
     end
 end)
 
-btnNoClip.MouseButton1Click:Connect(function()
-    noClip = not noClip
-    btnNoClip.Text = noClip and "✅ No Clip: Вкл" or "🚫 No Clip: Выкл"
+UIS.InputEnded:Connect(function(input)
+    if moveDirections[input.KeyCode] then
+        activeKeys[input.KeyCode] = nil
+    end
 end)
 
-RunService.Stepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
     if noClip then
         local char = LocalPlayer.Character
-        if char then
+        if char and char:FindFirstChild("HumanoidRootPart") then
             for _, part in pairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.CanCollide = false
                 end
+            end
+
+            local hrp = char.HumanoidRootPart
+            local cam = workspace.CurrentCamera
+            local dir = Vector3.new()
+            for key, active in pairs(activeKeys) do
+                if active then
+                    dir += moveDirections[key]
+                end
+            end
+            if dir.Magnitude > 0 then
+                local moveVec = cam.CFrame:VectorToWorldSpace(dir.Unit)
+                hrp.CFrame = hrp.CFrame + moveVec * noClipSpeed * dt
             end
         end
     end
