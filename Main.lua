@@ -2,12 +2,14 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 local basePos = nil
 local useAir = false
 local tweenSpeed = 16
-local noClipSpeed = 50
+local noClipSpeed = 0  -- изменено: начальное значение в диапазоне [-10,10]
 local noClip = false
 local tweening = false
 
@@ -16,19 +18,20 @@ if game.CoreGui:FindFirstChild("TweenTPGui") then
     game.CoreGui:FindFirstChild("TweenTPGui"):Destroy()
 end
 
--- Создаём GUI
+-- Создаём новый GUI
 local gui = Instance.new("ScreenGui", game.CoreGui)
 gui.Name = "TweenTPGui"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 320, 0, 300)
+frame.Size = UDim2.new(0, 320, 0, 350)
 frame.Position = UDim2.new(0.05, 0, 0.4, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 
+-- Функции для создания меток и слайдеров
 local function createLabel(text, posY)
     local label = Instance.new("TextLabel", frame)
     label.Size = UDim2.new(1, -20, 0, 20)
@@ -61,7 +64,7 @@ local function createSlider(posY, minVal, maxVal, initialVal)
     return sliderFrame, fill, handle
 end
 
--- Кнопки
+-- Создание кнопок
 local btnSetBase = Instance.new("TextButton", frame)
 btnSetBase.Size = UDim2.new(1, -20, 0, 35)
 btnSetBase.Position = UDim2.new(0, 10, 0, 10)
@@ -98,14 +101,22 @@ btnNoClip.TextColor3 = Color3.new(1, 1, 1)
 btnNoClip.Font = Enum.Font.GothamBold
 btnNoClip.TextSize = 16
 
--- Labels и слайдеры для скоростей
 local speedLabel = createLabel("Скорость Tween TP: "..tweenSpeed, 190)
 local speedSliderFrame, speedFill, speedHandle = createSlider(215, 5, 100, tweenSpeed)
 
 local noclipLabel = createLabel("Скорость No Clip: "..noClipSpeed, 245)
-local noclipSliderFrame, noclipFill, noclipHandle = createSlider(270, 10, 200, noClipSpeed)
+local noclipSliderFrame, noclipFill, noclipHandle = createSlider(270, -10, 10, noClipSpeed)
 
--- Функции для обновления положения и значения ползунков
+local btnServerHop = Instance.new("TextButton", frame)
+btnServerHop.Size = UDim2.new(1, -20, 0, 35)
+btnServerHop.Position = UDim2.new(0, 10, 0, 310)
+btnServerHop.Text = "🔄 Server Hop (1-2 игрока)"
+btnServerHop.BackgroundColor3 = Color3.fromRGB(60, 90, 60)
+btnServerHop.TextColor3 = Color3.new(1, 1, 1)
+btnServerHop.Font = Enum.Font.GothamBold
+btnServerHop.TextSize = 16
+
+-- Слежение за движением слайдеров
 local draggingSpeed = false
 local draggingNoClip = false
 
@@ -148,13 +159,14 @@ UIS.InputChanged:Connect(function(input)
             tweenSpeed = updateSlider(speedSliderFrame, speedFill, speedHandle, input.Position.X, 5, 100)
             speedLabel.Text = "Скорость Tween TP: "..tweenSpeed
         elseif draggingNoClip then
-            noClipSpeed = updateSlider(noclipSliderFrame, noclipFill, noclipHandle, input.Position.X, 10, 200)
+            noClipSpeed = updateSlider(noclipSliderFrame, noclipFill, noclipHandle, input.Position.X, -10, 10)
             noclipLabel.Text = "Скорость No Clip: "..noClipSpeed
         end
     end
 end)
 
 -- Кнопки
+
 btnNoClip.MouseButton1Click:Connect(function()
     noClip = not noClip
     btnNoClip.Text = noClip and "✅ No Clip: Вкл" or "🚫 No Clip: Выкл"
@@ -195,7 +207,37 @@ btnTweenTP.MouseButton1Click:Connect(function()
     tweening = false
 end)
 
--- No Clip движение
+-- Server Hop кнопка
+btnServerHop.MouseButton1Click:Connect(function()
+    btnServerHop.Text = "🔍 Поиск..."
+    local cursor = ""
+    local found = false
+    repeat
+        local success, response = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100&cursor="..cursor))
+        end)
+
+        if success and response and response.data then
+            for _, server in ipairs(response.data) do
+                if server.playing <= 2 and server.maxPlayers > 2 and server.id ~= game.JobId then
+                    found = true
+                    btnServerHop.Text = "🔁 Переход..."
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                    return
+                end
+            end
+            cursor = response.nextPageCursor or ""
+        else
+            break
+        end
+    until cursor == "" or found
+
+    btnServerHop.Text = found and "✅ Найден" or "❌ Не найдено"
+    task.wait(2)
+    btnServerHop.Text = "🔄 Server Hop (1-2 игрока)"
+end)
+
+-- No Clip движение и управление клавишами
 local activeKeys = {}
 local moveDirections = {
     [Enum.KeyCode.W] = Vector3.new(0, 0, -1),
