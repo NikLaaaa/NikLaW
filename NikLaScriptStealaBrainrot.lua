@@ -1,308 +1,340 @@
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local basePos = nil
-local useAir = false
-local tweenSpeed = 16
-local noClipSpeed = 0
-local noClip = false
-local tweening = false
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Удалить старый GUI
-if game.CoreGui:FindFirstChild("TweenTPGui") then
-    game.CoreGui:FindFirstChild("TweenTPGui"):Destroy()
-end
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local hum = character:WaitForChild("Humanoid")
 
--- Главный GUI
-local mainGui = Instance.new("ScreenGui", game.CoreGui)
-mainGui.Name = "TweenTPGui"
-mainGui.ResetOnSpawn = false
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+	character = newChar
+	hrp = character:WaitForChild("HumanoidRootPart")
+	hum = character:WaitForChild("Humanoid")
+end)
 
--- Кнопка показа/скрытия GUI
-local toggleButton = Instance.new("TextButton", mainGui)
-toggleButton.Size = UDim2.new(0, 50, 0, 50)
-toggleButton.Position = UDim2.new(0, 10, 0, 10)
-toggleButton.BackgroundColor3 = Color3.new(0, 0, 0)
-toggleButton.Text = ""
-toggleButton.AutoButtonColor = false
-toggleButton.Name = "ToggleButton"
+local gui = Instance.new("ScreenGui")
+gui.Name = "NikLaScriptGUI"
+gui.ResetOnSpawn = false
+gui.Parent = PlayerGui
 
-local corner = Instance.new("UICorner", toggleButton)
-corner.CornerRadius = UDim.new(1, 0)
-
--- GUI окно
-local frame = Instance.new("Frame", mainGui)
-frame.Size = UDim2.new(0, 320, 0, 350)
-frame.Position = UDim2.new(0.05, 0, 0.4, 0)
+-- Основной фрейм с GUI
+local frame = Instance.new("Frame")
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
+frame.Size = UDim2.new(0, 300, 0, 350)
+frame.Position = UDim2.new(0, 20, 0, 20)
 frame.Active = true
 frame.Draggable = true
-frame.Visible = false
+frame.Visible = true
+frame.Parent = gui
 
--- Тоггл
-toggleButton.MouseButton1Click:Connect(function()
-    frame.Visible = not frame.Visible
-end)
+local uicorner = Instance.new("UICorner", frame)
+uicorner.CornerRadius = UDim.new(0, 10)
 
--- Создание текста и слайдера
-local function createLabel(text, posY)
-    local label = Instance.new("TextLabel", frame)
-    label.Size = UDim2.new(1, -20, 0, 20)
-    label.Position = UDim2.new(0, 10, 0, posY)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.Text = text
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    return label
-end
+local uistroke = Instance.new("UIStroke", frame)
+uistroke.Thickness = 2
+uistroke.Color = Color3.fromRGB(70, 70, 70)
+uistroke.Transparency = 0.5
 
-local function createSlider(posY, minVal, maxVal, initialVal)
-    local sliderFrame = Instance.new("Frame", frame)
-    sliderFrame.Size = UDim2.new(1, -20, 0, 20)
-    sliderFrame.Position = UDim2.new(0, 10, 0, posY)
-    sliderFrame.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+-- Заголовок с радужным эффектом
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+title.BorderSizePixel = 0
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
+title.Text = "NikLaStore"
+title.TextStrokeTransparency = 0.7
+title.TextWrapped = true
 
-    local fill = Instance.new("Frame", sliderFrame)
-    fill.Size = UDim2.new((initialVal - minVal) / (maxVal - minVal), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(150, 150, 250)
-
-    local handle = Instance.new("ImageButton", sliderFrame)
-    handle.Size = UDim2.new(0, 16, 1, 0)
-    handle.Position = UDim2.new((initialVal - minVal) / (maxVal - minVal), -8, 0, 0)
-    handle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-    handle.Image = ""
-
-    return sliderFrame, fill, handle
-end
-
--- Кнопки
-local btnSetBase = Instance.new("TextButton", frame)
-btnSetBase.Size = UDim2.new(1, -20, 0, 35)
-btnSetBase.Position = UDim2.new(0, 10, 0, 10)
-btnSetBase.Text = "📍 Установить базу"
-btnSetBase.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-btnSetBase.TextColor3 = Color3.new(1, 1, 1)
-btnSetBase.Font = Enum.Font.GothamBold
-btnSetBase.TextSize = 16
-
-local btnTweenTP = Instance.new("TextButton", frame)
-btnTweenTP.Size = UDim2.new(1, -20, 0, 35)
-btnTweenTP.Position = UDim2.new(0, 10, 0, 55)
-btnTweenTP.Text = "➡ Tween TP к базе"
-btnTweenTP.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-btnTweenTP.TextColor3 = Color3.new(1, 1, 1)
-btnTweenTP.Font = Enum.Font.GothamBold
-btnTweenTP.TextSize = 16
-
-local btnMode = Instance.new("TextButton", frame)
-btnMode.Size = UDim2.new(1, -20, 0, 35)
-btnMode.Position = UDim2.new(0, 10, 0, 100)
-btnMode.Text = "☁️ Режим: Воздух"
-btnMode.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-btnMode.TextColor3 = Color3.new(1, 1, 1)
-btnMode.Font = Enum.Font.GothamBold
-btnMode.TextSize = 16
-
-local btnNoClip = Instance.new("TextButton", frame)
-btnNoClip.Size = UDim2.new(1, -20, 0, 35)
-btnNoClip.Position = UDim2.new(0, 10, 0, 145)
-btnNoClip.Text = "🚫 No Clip: Выкл"
-btnNoClip.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-btnNoClip.TextColor3 = Color3.new(1, 1, 1)
-btnNoClip.Font = Enum.Font.GothamBold
-btnNoClip.TextSize = 16
-
--- Слайдеры
-local speedLabel = createLabel("Скорость Tween TP: "..tweenSpeed, 190)
-local speedSliderFrame, speedFill, speedHandle = createSlider(215, 5, 100, tweenSpeed)
-
-local noclipLabel = createLabel("Скорость No Clip: "..noClipSpeed, 245)
-local noclipSliderFrame, noclipFill, noclipHandle = createSlider(270, -10, 10, noClipSpeed)
-
-local btnServerHop = Instance.new("TextButton", frame)
-btnServerHop.Size = UDim2.new(1, -20, 0, 35)
-btnServerHop.Position = UDim2.new(0, 10, 0, 310)
-btnServerHop.Text = "🔄 Server Hop (1-2 игрока)"
-btnServerHop.BackgroundColor3 = Color3.fromRGB(60, 90, 60)
-btnServerHop.TextColor3 = Color3.new(1, 1, 1)
-btnServerHop.Font = Enum.Font.GothamBold
-btnServerHop.TextSize = 16
-
--- Слайдеры — управление
-local draggingSpeed = false
-local draggingNoClip = false
-
-local function updateSlider(sliderFrame, fill, handle, inputX, minVal, maxVal)
-    local absPos = sliderFrame.AbsolutePosition.X
-    local absSize = sliderFrame.AbsoluteSize.X
-    local relativeX = math.clamp(inputX - absPos, 0, absSize)
-    local percent = relativeX / absSize
-    fill.Size = UDim2.new(percent, 0, 1, 0)
-    handle.Position = UDim2.new(percent, -8, 0, 0)
-    return math.floor(minVal + percent * (maxVal - minVal))
-end
-
-speedHandle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingSpeed = true
-    end
-end)
-speedHandle.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingSpeed = false
-    end
-end)
-
-noclipHandle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingNoClip = true
-    end
-end)
-noclipHandle.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingNoClip = false
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if draggingSpeed then
-            tweenSpeed = updateSlider(speedSliderFrame, speedFill, speedHandle, input.Position.X, 5, 100)
-            speedLabel.Text = "Скорость Tween TP: "..tweenSpeed
-        elseif draggingNoClip then
-            noClipSpeed = updateSlider(noclipSliderFrame, noclipFill, noclipHandle, input.Position.X, -10, 10)
-            noclipLabel.Text = "Скорость No Clip: "..noClipSpeed
-        end
-    end
-end)
-
--- Кнопки
-btnNoClip.MouseButton1Click:Connect(function()
-    noClip = not noClip
-    btnNoClip.Text = noClip and "✅ No Clip: Вкл" or "🚫 No Clip: Выкл"
-end)
-
-btnMode.MouseButton1Click:Connect(function()
-    useAir = not useAir
-    btnMode.Text = useAir and "☁️ Режим: Воздух" or "🌍 Режим: Земля"
-end)
-
-btnSetBase.MouseButton1Click:Connect(function()
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        basePos = char.HumanoidRootPart.Position
-        btnSetBase.Text = "✅ База установлена"
-        task.wait(1)
-        btnSetBase.Text = "📍 Установить базу"
-    end
-end)
-
-btnTweenTP.MouseButton1Click:Connect(function()
-    if not basePos or tweening then return end
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-
-    local hrp = char.HumanoidRootPart
-    local targetPos = basePos
-    if useAir then
-        targetPos = Vector3.new(basePos.X, basePos.Y + 40, basePos.Z)
-    end
-
-    local distance = (targetPos - hrp.Position).Magnitude
-    local time = distance / tweenSpeed
-    tweening = true
-    local tween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos)})
-    tween:Play()
-    tween.Completed:Wait()
-    tweening = false
-end)
-
-btnServerHop.MouseButton1Click:Connect(function()
-    btnServerHop.Text = "🔍 Поиск..."
-    local cursor = ""
-    local found = false
-    repeat
-        local success, response = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100&cursor="..cursor))
-        end)
-
-        if success and response and response.data then
-            for _, server in ipairs(response.data) do
-                if server.playing <= 2 and server.maxPlayers > 2 and server.id ~= game.JobId then
-                    found = true
-                    btnServerHop.Text = "🔁 Переход..."
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
-                    return
-                end
-            end
-            cursor = response.nextPageCursor or ""
-        else
-            break
-        end
-    until cursor == "" or found
-
-    btnServerHop.Text = found and "✅ Найден" or "❌ Не найдено"
-    task.wait(2)
-    btnServerHop.Text = "🔄 Server Hop (1-2 игрока)"
-end)
-
--- NoClip движение WASD
-local activeKeys = {}
-local moveDirections = {
-    [Enum.KeyCode.W] = Vector3.new(0, 0, -1),
-    [Enum.KeyCode.S] = Vector3.new(0, 0, 1),
-    [Enum.KeyCode.A] = Vector3.new(-1, 0, 0),
-    [Enum.KeyCode.D] = Vector3.new(1, 0, 0),
+local colors = {
+	Color3.fromRGB(255, 0, 0),
+	Color3.fromRGB(255, 127, 0),
+	Color3.fromRGB(255, 255, 0),
+	Color3.fromRGB(0, 255, 0),
+	Color3.fromRGB(0, 0, 255),
+	Color3.fromRGB(75, 0, 130),
+	Color3.fromRGB(148, 0, 211)
 }
 
-UIS.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if moveDirections[input.KeyCode] then
-        activeKeys[input.KeyCode] = true
-    end
+spawn(function()
+	local i = 1
+	local t = 0
+	while true do
+		local nextIndex = i + 1
+		if nextIndex > #colors then nextIndex = 1 end
+		while t < 1 do
+			title.TextColor3 = colors[i]:Lerp(colors[nextIndex], t)
+			t = t + 0.01
+			task.wait(0.03)
+		end
+		t = 0
+		i = nextIndex
+	end
 end)
 
-UIS.InputEnded:Connect(function(input)
-    if moveDirections[input.KeyCode] then
-        activeKeys[input.KeyCode] = nil
-    end
+-- Кнопка переключения GUI
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 40, 0, 40)
+toggleButton.Position = UDim2.new(0, 20, 0, 20)
+toggleButton.Text = "—"
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.TextSize = 24
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleButton.Parent = gui
+toggleButton.ZIndex = 10
+
+local guiVisible = true
+
+toggleButton.MouseButton1Click:Connect(function()
+	guiVisible = not guiVisible
+	frame.Visible = guiVisible
+	if guiVisible then
+		toggleButton.Text = "—"
+	else
+		toggleButton.Text = "+"
+	end
 end)
 
-RunService.RenderStepped:Connect(function(dt)
-    if noClip then
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
+-- Кнопка скорости
+local speedEnabled = false
+local defaultSpeed = hum and hum.WalkSpeed or 16
+local customSpeed = 50
 
-            local dir = Vector3.zero
-            for key, _ in pairs(activeKeys) do
-                dir += moveDirections[key]
-            end
+local speedButton = Instance.new("TextButton", frame)
+speedButton.Position = UDim2.new(0, 20, 0, 50)
+speedButton.Size = UDim2.new(1, -40, 0, 40)
+speedButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+speedButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+speedButton.Font = Enum.Font.Gotham
+speedButton.TextSize = 16
+speedButton.Text = "Speed Off"
 
-            if dir.Magnitude > 0 then
-                local cam = workspace.CurrentCamera
-                local moveVec = cam.CFrame:VectorToWorldSpace(dir.Unit)
-                char:MoveTo(char.HumanoidRootPart.Position + moveVec * noClipSpeed * dt)
-            end
-        end
-    end
+local function updateSpeedButton()
+	if speedEnabled then
+		speedButton.Text = "Speed On"
+		speedButton.BackgroundColor3 = Color3.fromRGB(80, 170, 80)
+	else
+		speedButton.Text = "Speed Off"
+		speedButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	end
+end
+
+speedButton.MouseButton1Click:Connect(function()
+	speedEnabled = not speedEnabled
+	updateSpeedButton()
+	if hum then
+		if speedEnabled then
+			hum.WalkSpeed = customSpeed
+		else
+			hum.WalkSpeed = defaultSpeed
+		end
+	end
 end)
 
--- Остальная логика кнопок — идентична твоей (не повторяю, т.к. не изменялась)
--- если надо — добавлю, скажи.
+updateSpeedButton()
 
--- === Ниже добавляй весь остальной твой GUI код (createLabel, createSlider, кнопки и т.п.)
--- НЕ забудь, что теперь `frame` - это родитель всех элементов GUI
--- Они будут скрываться/открываться по нажатию на кнопку-круг
+-- TP Up / TP Down
+local function createTPButton(text, yPos, offsetY)
+	local btn = Instance.new("TextButton", frame)
+	btn.Position = UDim2.new(0, 20, 0, yPos)
+	btn.Size = UDim2.new(1, -40, 0, 40)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 16
+	btn.Text = text
+
+	local corner = Instance.new("UICorner", btn)
+	corner.CornerRadius = UDim.new(0, 6)
+
+	btn.MouseButton1Click:Connect(function()
+		if hrp then
+			hrp.CFrame = hrp.CFrame + Vector3.new(0, offsetY, 0)
+		end
+	end)
+
+	return btn
+end
+
+local tpUpButton = createTPButton("TP Up", 100, 195)
+local tpDownButton = createTPButton("TP Down", 150, -180)
+
+-- TP10Up
+local tp10UpActive = false
+local tp10Height = 0
+
+local tp10UpButton = Instance.new("TextButton", frame)
+tp10UpButton.Position = UDim2.new(0, 20, 0, 200)
+tp10UpButton.Size = UDim2.new(1, -40, 0, 40)
+tp10UpButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+tp10UpButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+tp10UpButton.Font = Enum.Font.Gotham
+tp10UpButton.TextSize = 16
+tp10UpButton.Text = "TP10Up Off"
+
+local uicorner = Instance.new("UICorner", tp10UpButton)
+uicorner.CornerRadius = UDim.new(0, 6)
+
+tp10UpButton.MouseButton1Click:Connect(function()
+	tp10UpActive = not tp10UpActive
+	if tp10UpActive and hrp then
+		tp10Height = hrp.Position.Y + 10
+		tp10UpButton.Text = "TP10Up On"
+		tp10UpButton.BackgroundColor3 = Color3.fromRGB(80, 170, 80)
+	else
+		tp10UpButton.Text = "TP10Up Off"
+		tp10UpButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	end
+end)
+
+-- AutoStealth
+local autoStealthEnabled = false
+local stealthHeight = 5 -- Уменьшил высоту до 5 юнитов
+local highTeleportHeight = 195
+local driftSpeed = 75 -- Быстрая скорость
+local bodyPosition = nil
+local lastPosition = nil
+
+local autoStealthButton = Instance.new("TextButton", frame)
+autoStealthButton.Position = UDim2.new(0, 20, 0, 250)
+autoStealthButton.Size = UDim2.new(1, -40, 0, 40)
+autoStealthButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+autoStealthButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+autoStealthButton.Font = Enum.Font.Gotham
+autoStealthButton.TextSize = 16
+autoStealthButton.Text = "AutoStealth Off"
+
+local uicorner = Instance.new("UICorner", autoStealthButton)
+uicorner.CornerRadius = UDim.new(0, 6)
+
+-- Функция проверки крыши
+local function isRoofOpen()
+	local rayOrigin = hrp.Position + Vector3.new(0, stealthHeight + 2, 0)
+	local rayDirection = Vector3.new(0, 100, 0)
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterDescendantsInstances = {character}
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+	local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+	if not result then
+		warn("Roof is open!")
+		return true
+	else
+		warn("Roof is closed, hit: " .. tostring(result.Instance))
+		return false
+	end
+end
+
+local function updateStealthButton()
+	if autoStealthEnabled then
+		autoStealthButton.Text = "AutoSteal BETA On"
+		autoStealthButton.BackgroundColor3 = Color3.fromRGB(80, 170, 80)
+	else
+		autoStealthButton.Text = "AutoSteal BETA Off"
+		autoStealthButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	end
+end
+
+autoStealthButton.MouseButton1Click:Connect(function()
+	autoStealthEnabled = not autoStealthEnabled
+	updateStealthButton()
+	if autoStealthEnabled and hrp then
+		local pos = hrp.Position
+		lastPosition = pos
+		-- Создаем BodyPosition для зависания
+		bodyPosition = Instance.new("BodyPosition")
+		bodyPosition.MaxForce = Vector3.new(0, 30000, 0) -- Уменьшил силу
+		bodyPosition.Position = Vector3.new(pos.X, pos.Y + stealthHeight, pos.Z)
+		bodyPosition.D = 800 -- Меньше демпфирование для плавности
+		bodyPosition.P = 8000 -- Меньше сила для обхода античита
+		bodyPosition.Parent = hrp
+	else
+		if bodyPosition then
+			bodyPosition:Destroy()
+			bodyPosition = nil
+		end
+		hrp.Velocity = Vector3.new(0, 0, 0)
+		lastPosition = nil
+	end
+end)
+
+-- Обновление в Heartbeat
+RunService.Heartbeat:Connect(function(deltaTime)
+	if speedEnabled and hum and hum.WalkSpeed ~= customSpeed then
+		hum.WalkSpeed = customSpeed
+	elseif not speedEnabled and hum and hum.WalkSpeed ~= defaultSpeed then
+		hum.WalkSpeed = defaultSpeed
+	end
+
+	if tp10UpActive and hrp then
+		local pos = hrp.Position
+		if pos.Y < tp10Height then
+			hrp.CFrame = CFrame.new(pos.X, tp10Height, pos.Z)
+		else
+			hrp.Velocity = Vector3.new(hrp.Velocity.X, math.max(hrp.Velocity.Y, 0), hrp.Velocity.Z)
+		end
+	end
+
+	if autoStealthEnabled and hrp and hum then
+		local camera = Workspace.CurrentCamera
+		local pos = hrp.Position
+
+		-- Проверка на телепорт назад
+		if lastPosition and (pos - lastPosition).Magnitude > 10 then
+			warn("Teleport back detected! Disabling AutoStealth. Distance: " .. (pos - lastPosition).Magnitude)
+			if bodyPosition then
+				bodyPosition:Destroy()
+				bodyPosition = nil
+			end
+			hrp.Velocity = Vector3.new(0, 0, 0)
+			lastPosition = nil
+			autoStealthEnabled = false
+			updateStealthButton()
+			return
+		end
+
+		-- Обновление позиции BodyPosition
+		if bodyPosition then
+			bodyPosition.Position = Vector3.new(pos.X, lastPosition.Y + stealthHeight, pos.Z)
+		end
+
+		-- Движение по направлению камеры через CFrame
+		if camera then
+			local cameraDirection = camera.CFrame.LookVector
+			local horizontalDirection = Vector3.new(cameraDirection.X, 0, cameraDirection.Z).Unit
+			local moveVector = horizontalDirection * driftSpeed * deltaTime
+			-- Проверка на столкновение
+			local raycastParams = RaycastParams.new()
+			raycastParams.FilterDescendantsInstances = {character}
+			raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+			local rayResult = Workspace:Raycast(pos, moveVector * 2, raycastParams)
+			if not rayResult then
+				hrp.CFrame = hrp.CFrame + moveVector
+			else
+				warn("Movement blocked by: " .. tostring(rayResult.Instance)) -- Отладка застревания
+			end
+		end
+
+		-- Обновляем последнюю позицию
+		lastPosition = pos
+
+		-- Проверка крыши и телепорт на 195 юнитов
+		if isRoofOpen() then
+			if bodyPosition then
+				bodyPosition:Destroy()
+				bodyPosition = nil
+			end
+			hrp.CFrame = CFrame.new(pos.X, pos.Y + highTeleportHeight, pos.Z)
+			hrp.Velocity = Vector3.new(0, 0, 0)
+			lastPosition = nil
+			autoStealthEnabled = false
+			updateStealthButton()
+		end
+	end
+end)
